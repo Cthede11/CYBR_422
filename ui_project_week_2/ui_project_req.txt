@@ -1,0 +1,23 @@
+User Interface for a low spec device
+screen size is 64 x 64 pixels
+
+Acceptance Criteria:
+- initial drawing or image of user interface
+- it needs to have a menu system
+    - at least two different menus with children menu items
+- it needs to have folders to organize files
+- it needs to have an options/about page
+- it needs to have at least 6 colors
+- must show the time
+
+Process:
+- draw an example on computer or by hand
+- have ai use drawn image to create your work
+
+use LLM and try to make it interactive
+Bonus:
+make it do something
+
+ideas:
+moving folders
+crayon theme
