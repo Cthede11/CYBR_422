@@ -1,0 +1,60 @@
+<!-- 
+ An HTML structure with a heading (<h1>) and a paragraph (<p>).
+    CSS to style the page, background color and text color at the minimum.
+    JavaScript to update the heading text dynamically when the user types into an input field.
+    JavaScript to change the background color of the page on click.
+ -->
+
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name = "viewport" content = "width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body { 
+            background-color: chocolate;
+            color: chartreuse;
+
+        }
+    </style>
+</head>
+<body>
+    Hello, welcome to my page!
+    <h1 id="something">My awesome page!</h1>
+    <h2>less awesome</h2>
+    <p>This is the best html ever</p>
+    <input type="text" nmae="" id="myInput">
+    <button id="myButton">Click me!</button>
+    <script>
+        console.log('hw');
+
+        const myHeader = document.getElementById('something');
+        console.log(myHeader);
+        const myInput = document.getElementById('myInput');
+        console.log(myInput);
+
+        if (myInput) {
+            myInput.addEventListener('input', function(e) {
+                console.log(e.target.value);
+                if (myHeader) {
+                    myHeader.innerHTML = '<em>'+e.target.value+'</em>';
+                }
+                
+            });
+        }
+
+        const myButton = document.getElementById('myButton');
+        console.log(myButton);
+        if (myButton) {
+            myButton.addEventListener('click', function() {
+                if (document.body.style.backgroundColor === 'chocolate') {
+                    document.body.style.backgroundColor = 'blue';
+                } else {
+                    document.body.style.backgroundColor = 'chocolate';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
