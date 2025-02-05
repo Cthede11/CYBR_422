@@ -5,7 +5,7 @@ Acceptance Criteria:
 - initial drawing or image of user interface
 - it needs to have a menu system
     - at least two different menus with children menu items
-- it needs to have folders to organize files
+
 - it needs to have an options/about page
 - it needs to have at least 6 colors
 - must show the time
