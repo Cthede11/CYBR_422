@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pac-Man</title>
+</head>
+<body>
+    <div class="container">
+        <canvas
+          id="canvas"
+          width="400"
+          height="400"
+          style="height: 400px; width: 400px; border: 1px solid;"
+        ></canvas>
+        <pre id="log"></pre>
+    </div>
+    
+    <script>
+        let avatar = {
+            x: 1,
+            y: 1,
+            size: 10
+        };
+        let theCollision = {x:5, y:5};
+        let animationId;
+        let lastChange = 0;
+
+        const canvasEle = document.getElementById('canvas');
+        const logEle = document.getElementById('log');
+
+        function logIt() {
+            logEle.innerText = JSON.stringify(avatar, null, 2);
+        }
+
+        document.addEventListener('keydown', (event) => {
+            console.log('Key pressed:', event.key);
+            if (event.key === 'ArrowUp') {
+                avatar.y = avatar.y - 1;
+                boundaryDetection();
+            } else if (event.key === 'ArrowDown') {
+                avatar.y = avatar.y + 1;
+            } else if (event.key === 'ArrowLeft') {
+                avatar.x = avatar.x - 1;
+                boundaryDetection();
+            } else if (event.key === 'ArrowRight') {
+                avatar.x = avatar.x + 1;
+            }
+        });
+
+        function collisionDetection() {
+            console.log(avatar.x, avatar.y, theCollision.x, theCollision.y);
+            if (avatar.x === theCollision.x && avatar.y === theCollision.y) {
+                console.log('collision')
+                avatar.size +=1;
+            }
+        }
+
+        function boundaryDetection() {
+            if (avatar.x < 0) {
+                avatar.x = 0;
+                console.log('boundary reached');
+            } else if (avatar.y < 0) {
+                avatar.y = 0;
+                console.log('boundary reached');
+            }
+        }
+
+        function animate(timestamp) {
+            if (timestamp - lastChange >= 500) {
+                lastChange = timestamp;
+            }
+            logIt();
+            collisionDetection();
+            animationId = requestAnimationFrame(animate);
+        }
+        animationId = requestAnimationFrame(animate);
+
+        logIt();
+    </script>
+</body>
+</html>
