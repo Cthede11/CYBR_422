@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nested Persistent Desktop</title>
+  <style>
+    /* Overall Page Style */
+    body, html {
+      margin: 0;
+      padding: 0;
+      background-color: #f0f0f0;
+      font-family: Arial, sans-serif;
+    }
+    /* Desktop Container (64 x 64 pixels) */
+    #desktop {
+      position: relative;
+      width: 64px;
+      height: 64px;
+      background-color: #003366;
+      margin: 50px auto;
+      border: 2px solid #000;
+    }
+    /* Desktop Folder Icon */
+    .desktop-folder {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      background-color: gold;
+      border: 2px solid #333;
+      box-sizing: border-box;
+      cursor: move;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    .desktop-folder span {
+      font-size: 10px;
+      pointer-events: none;
+    }
+    /* About Icon */
+    .desktop-about {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      background-color: #007acc;
+      border: 2px solid #333;
+      box-sizing: border-box;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+    }
+    .desktop-about span {
+      font-size: 10px;
+      pointer-events: none;
+    }
+    /* Modal Overlay (for About, Folder Window, and File Editor) */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    /* Modal Content */
+    .modal-content {
+      background: #fff;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      color: #333;
+    }
+    /* About Modal */
+    #aboutModal .modal-content {
+      width: 300px;
+    }
+    /* Folder Window */
+    #folderModal .modal-content {
+      width: 360px;
+    }
+    #folderModal h2 {
+      margin: 5px 0;
+    }
+    #folderModal .folder-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 5px;
+    }
+    /* Folder container inside folder window */
+    #folderContainer {
+      position: relative;
+      width: 320px;
+      height: 300px;
+      border: 1px solid #333;
+      background: #fafafa;
+      margin: 10px auto;
+      overflow: hidden;
+    }
+    /* Icons inside Folder Window */
+    .folder-item {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border: 2px solid #333;
+      box-sizing: border-box;
+      cursor: move;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      background-color: #eee;
+      user-select: none;
+    }
+    .folder-item.file {
+      background-color: #fff;
+    }
+    .folder-item.folder {
+      background-color: gold;
+    }
+    /* File Editor Modal */
+    #fileEditorModal .modal-content {
+      width: 350px;
+    }
+    #fileEditorModal textarea {
+      width: 90%;
+      height: 150px;
+      margin-bottom: 10px;
+    }
+    /* Buttons */
+    button {
+      margin: 5px;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- Desktop Container -->
+  <div id="desktop">
+    <!-- Draggable Desktop Folder Icon -->
+    <div class="desktop-folder" id="desktopFolder" style="left: 0px; top: 0px;">
+      <span>F</span>
+    </div>
+    <!-- About Icon -->
+    <div class="desktop-about" id="aboutIcon" style="left: 32px; top: 32px;">
+      <span>?</span>
+    </div>
+  </div>
+  
+  <!-- About Modal -->
+  <div id="aboutModal" class="modal">
+    <div class="modal-content">
+      <h2>About This Desktop</h2>
+      <p>
+        This demo shows a persistent, nested folder system.<br>
+        Double‑click the desktop folder to open it.<br>
+        Double‑click folders to open them, right‑click items to rename,<br>
+        and double‑click files to edit their content.
+      </p>
+      <button id="closeAboutBtn">Close</button>
+    </div>
+  </div>
+  
+  <!-- Folder Window Modal -->
+  <div id="folderModal" class="modal">
+    <div class="modal-content">
+      <div class="folder-header">
+        <h2 id="folderTitle">Folder Contents</h2>
+        <button id="backBtn" style="display:none;">Back</button>
+      </div>
+      <div id="folderContainer"></div>
+      <div>
+        <button id="newFileBtn">New File</button>
+        <button id="newFolderBtn">New Folder</button>
+        <button id="closeFolderBtn">Close</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- File Editor Modal -->
+  <div id="fileEditorModal" class="modal">
+    <div class="modal-content">
+      <h2>Edit File</h2>
+      <textarea id="fileContentArea" placeholder="Type file contents here..."></textarea>
+      <div>
+        <button id="saveFileBtn">Save</button>
+        <button id="cancelFileBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    /*********************
+     * Data Model & Persistence
+     *********************/
+    // Our entire folder system is stored as a tree with a root folder.
+    // Each folder has: id, type ("folder"), label, children (array), x, y.
+    // Files have: id, type ("file"), label, x, y, content.
+    const STORAGE_KEY = 'rootFolder';
+    
+    // Load the root folder from localStorage, or create a default if missing.
+    function loadRootFolder() {
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (data) {
+        return JSON.parse(data);
+      } else {
+        // Create a default root folder.
+        const root = { 
+          id: 'root', 
+          type: 'folder', 
+          label: 'Root', 
+          children: [] 
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(root));
+        return root;
+      }
+    }
+    
+    // Save the entire root folder tree to localStorage.
+    function saveRootFolder() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(rootFolder));
+    }
+    
+    let rootFolder = loadRootFolder();
+    
+    /*********************
+     * Global State for Folder Window
+     *********************/
+    // currentFolder points to the folder (object) currently open in the folder window.
+    let currentFolder = null;
+    // Stack to keep track of folder navigation (for Back button).
+    const folderStack = [];
+    
+    /*********************
+     * Utility: Generate Unique ID
+     *********************/
+    function generateId() {
+      return 'item-' + new Date().getTime() + '-' + Math.floor(Math.random()*1000);
+    }
+    
+    /*********************
+     * Draggable Utility
+     *********************/
+    function makeDraggable(item, container, onDragEnd) {
+      let startX, startY, dragging = false;
+      
+      item.addEventListener('mousedown', function(e) {
+        startX = e.clientX;
+        startY = e.clientY;
+        
+        const itemRect = item.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const offsetX = e.clientX - itemRect.left;
+        const offsetY = e.clientY - itemRect.top;
+        
+        item.style.zIndex = 1000;
+  
+        function onMouseMove(e) {
+          if (!dragging) {
+            if (Math.abs(e.clientX - startX) > 3 || Math.abs(e.clientY - startY) > 3) {
+              dragging = true;
+            }
+          }
+          if (dragging) {
+            let newX = e.clientX - offsetX - containerRect.left;
+            let newY = e.clientY - offsetY - containerRect.top;
+  
+            const maxX = container.clientWidth - item.clientWidth;
+            const maxY = container.clientHeight - item.clientHeight;
+            newX = Math.max(0, Math.min(newX, maxX));
+            newY = Math.max(0, Math.min(newY, maxY));
+  
+            item.style.left = newX + 'px';
+            item.style.top = newY + 'px';
+          }
+        }
+  
+        function onMouseUp() {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+          item.style.zIndex = '';
+          if (dragging && typeof onDragEnd === 'function') {
+            onDragEnd(item);
+          }
+          setTimeout(() => { dragging = false; }, 0);
+        }
+  
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+  
+      item.ondragstart = function() { return false; };
+    }
+    
+    /*********************
+     * Desktop & About Modal Setup
+     *********************/
+    const desktop = document.getElementById('desktop');
+    const desktopFolder = document.getElementById('desktopFolder');
+    const aboutIcon = document.getElementById('aboutIcon');
+  
+    // Make the desktop folder draggable (within the 64×64 desktop).
+    makeDraggable(desktopFolder, desktop);
+    
+    // Double-clicking the desktop folder opens the root folder.
+    desktopFolder.addEventListener('dblclick', function() {
+      // Set currentFolder to root and clear any folderStack.
+      currentFolder = rootFolder;
+      folderStack.length = 0;
+      openFolderModal();
+    });
+    
+    // About modal behavior.
+    const aboutModal = document.getElementById('aboutModal');
+    const closeAboutBtn = document.getElementById('closeAboutBtn');
+    aboutIcon.addEventListener('click', function() {
+      aboutModal.style.display = 'flex';
+    });
+    closeAboutBtn.addEventListener('click', function() {
+      aboutModal.style.display = 'none';
+    });
+    aboutModal.addEventListener('click', function(e) {
+      if (e.target === aboutModal) aboutModal.style.display = 'none';
+    });
+    
+    /*********************
+     * Folder Window Setup
+     *********************/
+    const folderModal = document.getElementById('folderModal');
+    const folderContainer = document.getElementById('folderContainer');
+    const newFileBtn = document.getElementById('newFileBtn');
+    const newFolderBtn = document.getElementById('newFolderBtn');
+    const closeFolderBtn = document.getElementById('closeFolderBtn');
+    const backBtn = document.getElementById('backBtn');
+    const folderTitle = document.getElementById('folderTitle');
+    
+    // Render the items in the current folder.
+    function renderFolderItems() {
+      folderContainer.innerHTML = '';
+      folderTitle.textContent = currentFolder.label;
+      // Show the Back button if we are not at the root.
+      backBtn.style.display = (folderStack.length > 0) ? 'inline-block' : 'none';
+      
+      currentFolder.children.forEach(itemData => {
+        const itemElem = document.createElement('div');
+        itemElem.classList.add('folder-item', itemData.type);
+        itemElem.textContent = itemData.label;
+        itemElem.style.left = (itemData.x || 0) + 'px';
+        itemElem.style.top = (itemData.y || 0) + 'px';
+        itemElem.setAttribute('data-id', itemData.id);
+  
+        // Make item draggable; update its x,y on drag end.
+        makeDraggable(itemElem, folderContainer, function(elem) {
+          const id = elem.getAttribute('data-id');
+          const newX = parseInt(elem.style.left, 10);
+          const newY = parseInt(elem.style.top, 10);
+          const target = currentFolder.children.find(i => i.id === id);
+          if (target) {
+            target.x = newX;
+            target.y = newY;
+            saveRootFolder();
+          }
+        });
+  
+        // For files, double-click opens the file editor.
+        if (itemData.type === 'file') {
+          itemElem.addEventListener('dblclick', function() {
+            openFileEditor(itemData.id);
+          });
+        }
+  
+        // For folders, double-click opens that folder.
+        if (itemData.type === 'folder') {
+          itemElem.addEventListener('dblclick', function() {
+            folderStack.push(currentFolder);
+            currentFolder = itemData;
+            renderFolderItems();
+          });
+        }
+  
+        // Right-click (contextmenu) allows renaming.
+        itemElem.addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+          const newName = prompt("Enter new name:", itemData.label);
+          if (newName !== null && newName.trim() !== "") {
+            itemData.label = newName.trim();
+            saveRootFolder();
+            renderFolderItems();
+          }
+        });
+  
+        folderContainer.appendChild(itemElem);
+      });
+    }
+    
+    function openFolderModal() {
+      renderFolderItems();
+      folderModal.style.display = 'flex';
+    }
+    
+    newFileBtn.addEventListener('click', function() {
+      const newItem = {
+        id: generateId(),
+        type: 'file',
+        label: 'File ' + (currentFolder.children.filter(i => i.type === 'file').length + 1),
+        x: 0,
+        y: 0,
+        content: ''
+      };
+      currentFolder.children.push(newItem);
+      saveRootFolder();
+      renderFolderItems();
+    });
+    
+    newFolderBtn.addEventListener('click', function() {
+      const newItem = {
+        id: generateId(),
+        type: 'folder',
+        label: 'Folder ' + (currentFolder.children.filter(i => i.type === 'folder').length + 1),
+        x: 0,
+        y: 0,
+        children: []
+      };
+      currentFolder.children.push(newItem);
+      saveRootFolder();
+      renderFolderItems();
+    });
+    
+    closeFolderBtn.addEventListener('click', function() {
+      folderModal.style.display = 'none';
+    });
+    
+    backBtn.addEventListener('click', function() {
+      if (folderStack.length > 0) {
+        currentFolder = folderStack.pop();
+        renderFolderItems();
+      }
+    });
+    
+    folderModal.addEventListener('click', function(e) {
+      if (e.target === folderModal) folderModal.style.display = 'none';
+    });
+    
+    /*********************
+     * File Editor Setup
+     *********************/
+    const fileEditorModal = document.getElementById('fileEditorModal');
+    const fileContentArea = document.getElementById('fileContentArea');
+    const saveFileBtn = document.getElementById('saveFileBtn');
+    const cancelFileBtn = document.getElementById('cancelFileBtn');
+    
+    let currentEditingId = null;
+    
+    function openFileEditor(fileId) {
+      currentEditingId = fileId;
+      // Find the file in the current folder or in the root tree.
+      function findFileInFolder(folder) {
+        for (let item of folder.children) {
+          if (item.id === fileId && item.type === 'file') return item;
+          if (item.type === 'folder') {
+            const found = findFileInFolder(item);
+            if (found) return found;
+          }
+        }
+        return null;
+      }
+      const fileData = findFileInFolder(rootFolder);
+      if (fileData) {
+        fileContentArea.value = fileData.content;
+        fileEditorModal.style.display = 'flex';
+      }
+    }
+    
+    saveFileBtn.addEventListener('click', function() {
+      if (currentEditingId) {
+        // Find and update the file in the tree.
+        function updateFileContent(folder) {
+          for (let item of folder.children) {
+            if (item.id === currentEditingId && item.type === 'file') {
+              item.content = fileContentArea.value;
+              return true;
+            }
+            if (item.type === 'folder') {
+              if (updateFileContent(item)) return true;
+            }
+          }
+          return false;
+        }
+        updateFileContent(rootFolder);
+        saveRootFolder();
+        // Refresh the current folder view.
+        renderFolderItems();
+        currentEditingId = null;
+        fileEditorModal.style.display = 'none';
+      }
+    });
+    
+    cancelFileBtn.addEventListener('click', function() {
+      currentEditingId = null;
+      fileEditorModal.style.display = 'none';
+    });
+    
+    fileEditorModal.addEventListener('click', function(e) {
+      if (e.target === fileEditorModal) fileEditorModal.style.display = 'none';
+    });
+  </script>
+</body>
+</html>
